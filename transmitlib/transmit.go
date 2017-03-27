@@ -57,7 +57,6 @@ func CopyLocalToLocal(sourcefile string, targetfile string, h *hasher.Hasher, ch
 		dstchunk, err := target.GetChunk(chunkStream.ChunkId)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get chunk from target: %d: %s", chunkStream.ChunkId, err.Error())
-			break
 		}
 
 		// comparing both chunks, do nothing if both are equal

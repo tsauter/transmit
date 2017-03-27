@@ -90,7 +90,7 @@ func RegenerateFixtures() {
 			fixturesfile := filepath.Join("fixtures", tc.filename+".cachedump")
 			f, err := os.OpenFile(fixturesfile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 			if err != nil {
-				panic(fmt.Errorf("Failed to create new chunk check file: %s: %s", err.Error()))
+				panic(fmt.Errorf("Failed to create new chunk check file: %s: %s", fixturesfile, err.Error()))
 			}
 			defer f.Close()
 
