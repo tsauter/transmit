@@ -1,0 +1,6 @@
+go1.8.linux-amd64.tar.gz
+linux-4.10.4.tar.xz
+*.cachedump
+*.tcache.db
+test_tmp_*
+target_*

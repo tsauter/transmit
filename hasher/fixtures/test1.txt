@@ -1,0 +1,6 @@
+This is a small test file,
+with several lines.
+
+Should we change this file to markup (md)?
+
+The quick brown fox jumps over the lazy dog.
