@@ -42,9 +42,14 @@ transfer copy --sourcefile=bigsourcefile.zip --targetfile=bigtarget.zip
 
 The cache file for the target file will be removed automatically.
 
-## Advanced usage
+### Advanced usage
 
 The following optional parameters exist:
 
 * --chunksize: use different length for each chunk (the chunksize must match source and target chunk database)
 * --hash-algorithm: which algorithm is used for the checksums (md5, sha1, sha256 (must be equal between source and target database)
+
+## Wishlist
+
+* create a http client/server copy model
+* local database of existing files (to avoid transfering already existing chunks on the local system)
