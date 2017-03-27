@@ -62,11 +62,13 @@ func init() {
 		fmt.Printf("Hit Ctrl+C to abort.\n")
 		time.Sleep(time.Second * 1)
 		fmt.Printf("\n")
-		RegenerateFixtures()
+		if err := RegenerateFixtures(); err != nil {
+			panic(err)
+		}
 	}
 }
 
-func RegenerateFixtures() {
+func RegenerateFixtures() error {
 	for _, tc := range testcases {
 		// we wrap this in a func() to be able to use the defer statement
 		func() {
@@ -76,48 +78,48 @@ func RegenerateFixtures() {
 			var source SourceFile
 			source, err := OpenLocalSource(testfile)
 			if err != nil {
-				panic(fmt.Errorf("Failed to open test file: %s: %s", tc.filename, err.Error()))
+				return fmt.Errorf("Failed to open test file: %s: %s", tc.filename, err.Error())
 			}
 			defer source.Close()
 
 			// recreate the chunk database
 			err = source.BuildCache(&tc.hasher, tc.chunksize)
 			if err != nil {
-				panic(fmt.Errorf(err.Error()))
+				return fmt.Errorf(err.Error())
 			}
 
 			// re-read all chunks and write them to a file
 			fixturesfile := filepath.Join("fixtures", tc.filename+".cachedump")
 			f, err := os.OpenFile(fixturesfile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 			if err != nil {
-				panic(fmt.Errorf("Failed to create new chunk check file: %s: %s", fixturesfile, err.Error()))
+				return fmt.Errorf("Failed to create new chunk check file: %s: %s", fixturesfile, err.Error())
 			}
 			defer f.Close()
 
 			info, err := source.GetFileInfo()
 			if err != nil {
-				panic(fmt.Errorf("Failed to get file info from cache: %s", err.Error()))
+				return fmt.Errorf("Failed to get file info from cache: %s", err.Error())
 			}
 			_, err = f.WriteString(fmt.Sprintf("%#v\n", info))
 			if err != nil {
-				panic(fmt.Errorf("Failed to write test file: %s", err.Error()))
+				return fmt.Errorf("Failed to write test file: %s", err.Error())
 			}
 
 			numOfChunks, chunkStreamChan := source.GetAllChunks()
 			_, err = f.WriteString(fmt.Sprintf("Chunks: %d\n", numOfChunks))
 			if err != nil {
-				panic(fmt.Errorf("Failed to write test file: %s", err.Error()))
+				return fmt.Errorf("Failed to write test file: %s", err.Error())
 			}
 			for chunkStream := range chunkStreamChan {
 				_, err = f.WriteString(fmt.Sprintf("%#v\n", chunkStream))
 				if err != nil {
-					panic(fmt.Errorf("Failed to write test file: %s", err.Error()))
+					return fmt.Errorf("Failed to write test file: %s", err.Error())
 				}
 			}
 
 			err = f.Sync()
 			if err != nil {
-				panic(fmt.Errorf("Failed to write test file (sync): %s", err.Error()))
+				return fmt.Errorf("Failed to write test file (sync): %s", err.Error())
 			}
 		}()
 
@@ -167,7 +169,7 @@ func TestLocalFileCacheGeneration(t *testing.T) {
 			numOfChunks, chunkStreamChan := source.GetAllChunks()
 			_, err = f.WriteString(fmt.Sprintf("Chunks: %d\n", numOfChunks))
 			if err != nil {
-				panic(fmt.Errorf("[%s] Failed to write test file: %s", tc.filename, err.Error()))
+				t.Fatalf("[%s] Failed to write test file: %s", tc.filename, err.Error())
 			}
 			for chunkStream := range chunkStreamChan {
 				_, err = f.WriteString(fmt.Sprintf("%#v\n", chunkStream))
