@@ -71,7 +71,7 @@ func init() {
 func RegenerateFixtures() error {
 	for _, tc := range testcases {
 		// we wrap this in a func() to be able to use the defer statement
-		func() {
+		err := func() error {
 			testfile := filepath.Join("fixtures", tc.filename)
 
 			// open the source file
@@ -121,9 +121,17 @@ func RegenerateFixtures() error {
 			if err != nil {
 				return fmt.Errorf("Failed to write test file (sync): %s", err.Error())
 			}
+
+			return nil
 		}()
 
+		if err != nil {
+			return err
+		}
+
 	}
+
+	return nil
 }
 
 func TestLocalFileCacheGeneration(t *testing.T) {
