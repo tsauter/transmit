@@ -7,6 +7,9 @@ import (
 	"gopkg.in/cheggaaa/pb.v1"
 )
 
+// CopyLocalToLocal copy the sourcefile to the targetfile. Both files must be available on
+// the local filesystem (drives, mount points, mounted nfs or smb shares).
+// The hasher and chunksize parameter must must the options used in the source file cache.
 func CopyLocalToLocal(sourcefile string, targetfile string, h *hasher.Hasher, chunksize int) error {
 	var source SourceFile
 	source, err := OpenLocalSource(sourcefile)

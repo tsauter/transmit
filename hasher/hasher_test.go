@@ -4,7 +4,8 @@ import (
 	"testing"
 )
 
-func Test_Interface(t *testing.T) {
+// TestInterface make sure that all expected structs satisfy the interface
+func TestInterface(t *testing.T) {
 	// make sure all hash implementations satisify the
 	// Hasher interface
 	var hash Hasher

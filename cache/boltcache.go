@@ -22,6 +22,7 @@ type BoltCache struct {
 	DB         bolt.DB
 }
 
+// NewBoltCache return a initialized bolt db cache struct.
 func NewBoltCache() *BoltCache {
 	bc := &BoltCache{}
 	return bc
@@ -33,7 +34,8 @@ func (bc *BoltCache) InitDatabase(cachefilename string) error {
 	cachefilename = cachefilename + ".db" // the .db is required for Bolt databases
 	bc.DbFilename = cachefilename
 
-	db, err := bolt.Open(cachefilename, 0600, &bolt.Options{Timeout: 1 * time.Second})
+	// Open the bold db, use a long timeout, for slow networks
+	db, err := bolt.Open(cachefilename, 0600, &bolt.Options{Timeout: 5 * time.Second})
 	if err != nil {
 		return errors.Wrapf(err, "failed to create cache database (%s)", cachefilename)
 	}
@@ -60,13 +62,14 @@ func (bc *BoltCache) InitDatabase(cachefilename string) error {
 	return nil
 }
 
-// CloseDatabase sync and close the bolt database
+// CloseDatabase sync and close the bolt database.
 func (bc *BoltCache) CloseDatabase() error {
 	err := bc.DB.Close()
-	return err
+	return errors.Wrap(err, "failed to close database")
 }
 
-// Cleanup delete the bolt db file in the filesystem
+// Cleanup delete the bolt db file in the filesystem.
+// Bolt DB is a nosql database.
 func (bc *BoltCache) Cleanup() error {
 	// make sure the db is already closed
 	err := bc.CloseDatabase()
@@ -77,26 +80,29 @@ func (bc *BoltCache) Cleanup() error {
 	// delete the file
 	err = os.Remove(bc.DbFilename)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "deleting database failed")
 	}
 
 	return nil
 }
 
-// ClearAllChunks remove all previous stored chunks from bolt database
-// (delete * from chunks)
+// ClearAllChunks remove all previous stored chunks from bolt database.
+// (e.g. delete * from chunks)
 func (bc *BoltCache) ClearAllChunks() error {
 	err := bc.DB.Update(func(tx *bolt.Tx) error {
+		// to delete all entries simply delete the complete bucket
 		err := tx.DeleteBucket([]byte(BOLT_BUCKETNAME_CHUNKS))
 		if err != nil {
 			return err
 		}
+		// recreate the bucket
 		_, err = tx.CreateBucket([]byte(BOLT_BUCKETNAME_CHUNKS))
 		return err
 	})
 	if err != nil {
 		return errors.Wrap(err, "clear chunks failed")
 	}
+
 	return nil
 }
 
@@ -116,33 +122,42 @@ func (bc *BoltCache) GetFileInfo() (structs.FileData, error) {
 		return nil
 	})
 	if err != nil {
-		return fd, err
+		return fd, errors.Wrap(err, "failed to get file info from database")
 	}
 
+	// unmarshel the struct from a json string, bolt store values as byte slices
 	err = json.Unmarshal(jsonbytes, &fd)
-	return fd, err
+	if err != nil {
+		return fd, errors.Wrap(err, "file info is corrupt in database")
+	}
+
+	return fd, nil
 }
 
-// StoreFileInfo takes a FileData struct and store those data
-// in the bolt database.
+// StoreFileInfo takes a FileData struct and store those data in the bolt database.
 // If an error occures, this error will be returned.
 // The file information is stored as marshaled json data in the bucket BOLT_BUCKETNAME_INFO
 func (bc *BoltCache) StoreFileInfo(fd structs.FileData) error {
+	// marshel the struct to a json string, bolt store values as byte slices
 	marshaled_data, err := json.Marshal(fd)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to convert file info to json")
 	}
 
 	err = bc.DB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(BOLT_BUCKETNAME_INFO))
 		return b.Put([]byte(BOLT_BUCKETNAME_INFO), marshaled_data)
 	})
-	return err
+	if err != nil {
+		return errors.Wrap(err, "failed to store file info in database")
+	}
+
+	return nil
 }
 
 // GetChunk returns the chunk stored under the paramter chunkid.
 // An error is return when the chunk was not found.
-// The complete Chunk strict will be returned.
+// The complete Chunk struct will be returned.
 func (bc *BoltCache) GetChunk(chunkId uint64) (structs.Chunk, error) {
 	var jsonbytes []byte
 	var chunk structs.Chunk
@@ -158,25 +173,33 @@ func (bc *BoltCache) GetChunk(chunkId uint64) (structs.Chunk, error) {
 		return chunk, fmt.Errorf("chunk %d not found", chunkId)
 	}
 
-	// unmarshal the data to a chunk struct
+	// unmarshal the data to a chunk struct, bolt stores all entries a byte slices
 	err = json.Unmarshal(jsonbytes, &chunk)
-	return chunk, err
+	if err != nil {
+		return chunk, errors.Wrap(err, "chunk info is corrupt in database")
+	}
+
+	return chunk, nil
 }
 
-// StoreChunk store the passed chunk in the database. The chunk,
-// is a marshalled json string.
+// StoreChunk store the passed chunk (references by chunk id) in the database.
+// The chunk is stored as a marshaled json string.
 func (bc *BoltCache) StoreChunk(chunkId uint64, chunk structs.Chunk) error {
+	// marshel the struct to a json string, bolt store values as byte slices
 	marshaled_data, err := json.Marshal(chunk)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to convert chunk info to json")
 	}
 
 	err = bc.DB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(BOLT_BUCKETNAME_CHUNKS))
 		return b.Put(itob(chunkId), marshaled_data)
 	})
+	if err != nil {
+		return errors.Wrap(err, "failed to get chunk info from database")
+	}
 
-	return err
+	return nil
 }
 
 // GetChunksCount return the number of stored chunks.
@@ -191,15 +214,16 @@ func (bc *BoltCache) GetChunksCount() (int, error) {
 		return nil
 	})
 	if err != nil {
-		return 0, err
+		return 0, errors.Wrap(err, "failed to get number of stored chunk from database")
 	}
 
-	return stats.KeyN, err
+	return stats.KeyN, nil
 }
 
 // GetChunksCount return the number of stored chunks.
+// The function requires a ChunkStream channel as argument, this channel
+// is used to pass back each element.
 // In case of an error, this error is returned.
-// TODO: do we need to sort them?
 func (bc *BoltCache) GetAllChunks(chunkStreamChan chan structs.ChunkStream) error {
 	err := bc.DB.View(func(tx *bolt.Tx) error {
 		// Assume bucket exists and has keys
@@ -207,9 +231,9 @@ func (bc *BoltCache) GetAllChunks(chunkStreamChan chan structs.ChunkStream) erro
 
 		c := b.Cursor()
 
-		i := 0
+		// walk over all bucket entries and write each
+		// element as a ChunkStream object to the chunkStreamChan channel
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			//fmt.Printf("    %d: %s\n", i, v)
 			var chunk structs.Chunk
 			err := json.Unmarshal(v, &chunk)
 			if err != nil {
@@ -224,12 +248,15 @@ func (bc *BoltCache) GetAllChunks(chunkStreamChan chan structs.ChunkStream) erro
 			chunkstrm := structs.ChunkStream{ChunkId: pos, Chunk: chunk}
 
 			chunkStreamChan <- chunkstrm
-			i++
 		}
 
 		return nil
 	})
-	return err
+	if err != nil {
+		return errors.Wrap(err, "failed to get chunk from database")
+	}
+
+	return nil
 }
 
 // itab converts a uint64 value into an 8 byte long byte slice.
@@ -240,6 +267,7 @@ func itob(v uint64) []byte {
 	return b
 }
 
+// btoi converts a bolt database key value back to uint64.
 func btoi(b []byte) (uint64, error) {
 	var i uint64
 	buf := bytes.NewReader(b)

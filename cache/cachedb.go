@@ -4,6 +4,8 @@ import (
 	"github.com/tsauter/transmit/structs"
 )
 
+// CacheDB is the generic interface for chunk cache backends.
+// Backends could be bolt, mysql, json...
 type CacheDB interface {
 	// Open a connecton to the database. This will not fill chunk details.
 	InitDatabase(sourcefile string) error
