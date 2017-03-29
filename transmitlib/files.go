@@ -17,10 +17,10 @@ type SourceFile interface {
 	// GetChunk return the specified chunk details from source database.
 	// This is not the real raw data from source file.
 	GetChunk(chunkNo uint64) (structs.Chunk, error)
-	// GetAllChunks return all available chunks form source database, the chunks are passed.
+	// GetAllChunks return all available chunks form source database, the chunks are passed
 	// back through the pipe.
 	GetAllChunks() (int, chan structs.ChunkStream)
-	// Read reads the raw data from source file (not the chunk) and return the data.
+	// ReadChunkData reads the raw data from source file (not the chunk) and return the data.
 	ReadChunkData(filepos int64) ([]byte, int, error)
 	// Close closes the source file and source cache database.
 	Close() error

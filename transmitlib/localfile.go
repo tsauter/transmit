@@ -13,14 +13,22 @@ import (
 	"strings"
 )
 
+// LocalFile is the internal representation of the LocalFile
 type LocalFile struct {
-	filename  string
-	f         *os.File
-	h         hasher.Hasher
+	// the filename of the file
+	filename string
+	// the file handle of the file
+	f *os.File
+	// the haser that should be used
+	h hasher.Hasher
+	// chunk size
 	chunksize int
-	cache     cache.CacheDB
+	// how and where should we cache the chunks
+	cache cache.CacheDB
 }
 
+// OpenLocalSource opens the soure file in the local filesystem.
+// A LocalFile struct is returned.
 func OpenLocalSource(filename string) (*LocalFile, error) {
 	lf := LocalFile{filename: filename}
 
@@ -36,6 +44,9 @@ func OpenLocalSource(filename string) (*LocalFile, error) {
 	return &lf, nil
 }
 
+// OpenOrCreateLocalTarget opens the target file in the filesystem. If the file
+// does not exists, it will be created.
+// A LocalFile struct is returned.
 func OpenOrCreateLocalTarget(filename string) (*LocalFile, error) {
 	lf := LocalFile{filename: filename}
 
@@ -51,6 +62,7 @@ func OpenOrCreateLocalTarget(filename string) (*LocalFile, error) {
 	return &lf, nil
 }
 
+// LoadCache loads the chunk cache database for the local file.
 func (lf *LocalFile) LoadCache() error {
 	// read the file
 	err := lf.cache.InitDatabase(lf.filename + ".tcache")
@@ -81,6 +93,8 @@ func (lf *LocalFile) LoadCache() error {
 	return nil
 }
 
+// BuildCache regnerates the complete chunk database by rereading the whole file.
+// Existing cache data will be removed.
 func (lf *LocalFile) BuildCache(h *hasher.Hasher, chunksize int) error {
 	lf.chunksize = chunksize
 	lf.h = *h
@@ -152,10 +166,12 @@ func (lf *LocalFile) BuildCache(h *hasher.Hasher, chunksize int) error {
 	return nil
 }
 
+// GetFileInfo return the previously stored filedata from the cache database.
 func (lf *LocalFile) GetFileInfo() (structs.FileData, error) {
 	return lf.cache.GetFileInfo()
 }
 
+// SetFilesize resize the file to the specified file size. Unit is bytes.
 func (lf *LocalFile) SetFilesize(newsize int64) error {
 	stats, err := lf.f.Stat()
 	if err != nil {
@@ -177,6 +193,7 @@ func (lf *LocalFile) SetFilesize(newsize int64) error {
 	return nil
 }
 
+// Close closes the cache database and the open file handle.
 func (lf *LocalFile) Close() error {
 	// close the cache database
 	if lf.cache != nil {
@@ -195,6 +212,8 @@ func (lf *LocalFile) Close() error {
 	return nil
 }
 
+// CloseAndRemove closes the cache database and the open file handle; the
+// cache database will be deleted in the filesystem.
 func (lf *LocalFile) CloseAndRemove() error {
 	// close the cache database
 	if lf.cache != nil {
@@ -216,6 +235,8 @@ func (lf *LocalFile) CloseAndRemove() error {
 	return nil
 }
 
+// GetAllChunks return all available chunks form database, the chunks are passed
+// back through the pipe.
 func (lf *LocalFile) GetAllChunks() (int, chan structs.ChunkStream) {
 	chunkStreamChan := make(chan structs.ChunkStream, 1)
 
@@ -229,6 +250,7 @@ func (lf *LocalFile) GetAllChunks() (int, chan structs.ChunkStream) {
 	return numberOfChunks, chunkStreamChan
 }
 
+// ReadChunkData reads the raw data from file (not the chunk) and return the data.
 func (lf *LocalFile) ReadChunkData(filepos int64) ([]byte, int, error) {
 	_, err := lf.f.Seek(filepos, 0)
 	if err != nil {
@@ -243,6 +265,10 @@ func (lf *LocalFile) ReadChunkData(filepos int64) ([]byte, int, error) {
 	return buf, buflen, nil
 }
 
+// WriteChunkData write the raw data, readed from file, to the file at the specified
+// file position.
+// The number of bytes to write are specified through datalen. Normally, datalen
+// is the chunksize.
 func (lf *LocalFile) WriteChunkData(filepos int64, data []byte, datalen int) error {
 	_, err := lf.f.Seek(filepos, 0)
 	if err != nil {
@@ -257,6 +283,8 @@ func (lf *LocalFile) WriteChunkData(filepos int64, data []byte, datalen int) err
 	return nil
 }
 
+// GetChunk return the specified chunk details from database.
+// This is not the real raw data from file.
 func (lf *LocalFile) GetChunk(chunkNo uint64) (structs.Chunk, error) {
 	return lf.cache.GetChunk(chunkNo)
 }
