@@ -19,7 +19,7 @@ type LocalFile struct {
 	filename string
 	// the file handle of the file
 	f *os.File
-	// the haser that should be used
+	// the hasher that should be used
 	h hasher.Hasher
 	// chunk size
 	chunksize int
