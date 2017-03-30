@@ -17,6 +17,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/tsauter/transmit/hasher"
@@ -40,8 +41,9 @@ to quickly create a Cobra application.`,
 				fmt.Printf("Missing source or target file.\n")
 				os.Exit(1)
 			}
-			if _, err := os.Stat(sourcefilename); os.IsNotExist(err) {
-				fmt.Printf("File does not exist: %s\n", sourcefilename)
+
+			if strings.HasPrefix(targetfilename, "http://") {
+				fmt.Printf("Target file can not be a remote file (http)\n")
 				os.Exit(1)
 			}
 
@@ -61,12 +63,24 @@ to quickly create a Cobra application.`,
 
 			fmt.Printf("Copy file %s to %s (algorithm %s, chunksize %d Bytes)\n", sourcefilename, targetfilename, ghasher.GetName(), chunksize)
 
-			err := transmitlib.CopyLocalToLocal(sourcefilename, targetfilename, &ghasher, chunksize)
+			var err error
+
+			if strings.HasPrefix(sourcefilename, "http://") {
+				err = transmitlib.CopyHttpToLocal(sourcefilename, targetfilename, &ghasher, chunksize)
+
+			} else {
+				if _, err := os.Stat(sourcefilename); os.IsNotExist(err) {
+					fmt.Printf("File does not exist: %s\n", sourcefilename)
+					os.Exit(1)
+				}
+
+				err = transmitlib.CopyLocalToLocal(sourcefilename, targetfilename, &ghasher, chunksize)
+			}
+
 			if err != nil {
 				fmt.Printf("Failed to copy file: %s -> %s: %s", sourcefilename, targetfilename, err.Error())
 				os.Exit(1)
 			}
-
 			fmt.Printf("File successfully copied!\n")
 
 		},
