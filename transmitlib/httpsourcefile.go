@@ -133,16 +133,16 @@ func (hf *HttpFile) FetchRemoteBytes(method string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to query remote size: %d: %s", resp.StatusCode, resp.Request.URL.String())
 	}
 
-	fmt.Printf("%#v\n", resp.Header)
-
 	content, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read data from remote server")
 	}
 
 	if resp.Header.Get("X-Chunklength") != "" {
-		length, _ := strconv.Atoi(resp.Header.Get("X-Chunklength"))
-		content = content[:length]
+		length, err := strconv.Atoi(resp.Header.Get("X-Chunklength"))
+		if err == nil {
+			content = content[:length]
+		}
 	}
 
 	return content, nil

@@ -157,7 +157,7 @@ func CopyHttpToLocal(baseurl string, targetfile string, h *hasher.Hasher, chunks
 
 		// comparing both chunks, do nothing if both are equal
 		if chunkStream.Chunk.Hash == dstchunk.Hash {
-			//fmt.Printf("Chunk %d is equal: %s == %s\n", chunkStream.ChunkId, chunkStream.Chunk.Hash, dstchunk.Hash)
+			//fmt.Printf("Chunk %d is equal: %s == %s)\n", chunkStream.ChunkId, chunkStream.Chunk.Hash, dstchunk.Hash)
 			continue
 		}
 		//fmt.Printf("Chunk %d different: %s != %s\n", chunkStream.ChunkId, chunkStream.Chunk.Hash, dstchunk.Hash)
@@ -185,7 +185,7 @@ func CopyHttpToLocal(baseurl string, targetfile string, h *hasher.Hasher, chunks
 		return errors.Wrapf(err, "failed to calculate checksum: %s: %s", targetfile, err.Error())
 	}
 	if sourceinfo.Checksum != tchecksum {
-		return errors.Wrapf(err, "checksum is different, test returns different data")
+		return fmt.Errorf("checksum is different, test returns different data")
 	}
 
 	return nil
@@ -228,6 +228,7 @@ func ServeFileOverHttp(listenAddress string, sourcefile string) error {
 		}
 
 		fmt.Printf("Sending file info...\n")
+		fmt.Printf("   %#v\n", fileinfo)
 		fmt.Fprintf(w, string(jsondata))
 	}).Methods("GET")
 
@@ -283,14 +284,7 @@ func ServeFileOverHttp(listenAddress string, sourcefile string) error {
 			return
 		}
 
-		chunk, err := source.GetChunk(chunkno)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			fmt.Printf("ReadChunkData: %d: %s\n", chunkno, err.Error())
-			return
-		}
-
-		filepos := int64(chunkno * uint64(chunk.Size))
+		filepos := int64(chunkno * uint64(fileinfo.Chunksize))
 
 		data, datalen, err := source.ReadChunkData(filepos)
 		if err != nil {
@@ -300,9 +294,10 @@ func ServeFileOverHttp(listenAddress string, sourcefile string) error {
 
 		fmt.Printf("Sending chunk data (%d bytes)...\n", datalen)
 		w.Header().Set("Content-Type", "application/octet-stream")
+		//TODO
 		//w.Header().Set("Content-Length", strconv.Itoa(datalen))
 		w.Header().Set("X-ChunkLength", strconv.Itoa(datalen))
-		fmt.Fprintf(w, string(data))
+		w.Write(data)
 	}).Methods("GET")
 
 	fmt.Printf("Waiting for incoming requests...\n")
