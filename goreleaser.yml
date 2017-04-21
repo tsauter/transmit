@@ -1,5 +1,5 @@
 build:
-    binary_name: transmit
+    binary: transmit
     goos:
         - windows
         - linux
